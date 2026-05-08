@@ -1,0 +1,54 @@
+# ========================
+# SECRETS - NEVER COMMIT!
+# ========================
+.env
+backend/.env
+frontend/.env
+frontend/.env.local
+*.env
+
+# ========================
+# Python
+# ========================
+backend/venv/
+backend/__pycache__/
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/**/*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ========================
+# Database & Vector Store
+# ========================
+backend/ragscope.db
+backend/local_vec_db.json
+backend/chroma_db/
+
+# ========================
+# Node / Frontend
+# ========================
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# ========================
+# Docker
+# ========================
+docker/volumes/
+
+# ========================
+# OS Files
+# ========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ========================
+# IDE
+# ========================
+.vscode/
+.idea/
+*.swp
