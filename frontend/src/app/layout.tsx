@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import { LayoutDashboard, MessageSquare, Upload, Activity } from "lucide-react";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "RAGScope - Production RAG Platform",
@@ -18,7 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.className} min-h-screen bg-neutral-950 text-neutral-50 flex`}>
+      <body className="min-h-screen bg-neutral-950 text-neutral-50 flex font-sans">
         {/* Sidebar */}
         <div className="w-64 border-r border-neutral-800 bg-neutral-900 flex flex-col hidden md:flex">
           <div className="p-6 border-b border-neutral-800">

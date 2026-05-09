@@ -4,7 +4,6 @@ import { useState } from "react";
 import axios from "axios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Send, ThumbsUp, ThumbsDown, Bot, User } from "lucide-react";
 
@@ -28,10 +27,12 @@ export default function ChatPage() {
         { role: "assistant", content: res.data.answer, telemetryId: res.data.telemetry_id }
       ]);
     } catch (error) {
-      console.error(error);
+      const detail = axios.isAxiosError(error)
+        ? error.response?.data?.detail || error.message
+        : "Please try again.";
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." }
+        { role: "assistant", content: `Sorry, I encountered an error. ${detail}` }
       ]);
     } finally {
       setIsLoading(false);
@@ -43,7 +44,10 @@ export default function ChatPage() {
       await axios.post("http://127.0.0.1:8000/api/feedback/", { telemetry_id: telemetryId, score });
       alert("Feedback submitted!");
     } catch (e) {
-      console.error(e);
+      const detail = axios.isAxiosError(e)
+        ? e.response?.data?.detail || e.message
+        : "Please try again.";
+      alert(`Failed to submit feedback. ${detail}`);
     }
   };
 

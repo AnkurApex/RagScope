@@ -14,14 +14,36 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+type Metrics = {
+  total_queries: number;
+  avg_latency_ms: number;
+  total_documents: number;
+  hallucination_rate: number;
+  positive_feedback: number;
+  negative_feedback: number;
+  avg_prompt_tokens: number;
+  avg_completion_tokens: number;
+};
+
 export default function DashboardPage() {
-  const [metrics, setMetrics] = useState<any>(null);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    axios.get("http://127.0.0.1:8000/api/analytics/metrics").then((res) => {
-      setMetrics(res.data);
-    });
+    axios
+      .get("http://127.0.0.1:8000/api/analytics/metrics")
+      .then((res) => {
+        setMetrics(res.data);
+      })
+      .catch((e) => {
+        const detail = axios.isAxiosError(e)
+          ? e.response?.data?.detail || e.message
+          : "Please try again.";
+        setError(detail);
+      });
   }, []);
+
+  if (error) return <div className="p-8 text-red-400">Failed to load metrics. {error}</div>;
 
   if (!metrics) return <div className="p-8 text-neutral-400">Loading metrics...</div>;
 

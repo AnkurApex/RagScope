@@ -1,19 +1,83 @@
 import os
 import math
 import json
-from google import genai
-from google.genai import types
+import hashlib
+import re
 from typing import List
+import google.generativeai as genai
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-def get_embedding(text: str) -> List[float]:
-    result = client.models.embed_content(
-        model="gemini-embedding-001",
-        contents=text,
-        config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT")
-    )
-    return result.embeddings[0].values
+LOCAL_EMBEDDING_DIM = 384
+_REMOTE_EMBEDDING_UNAVAILABLE = False
+
+def _local_embedding(text: str) -> List[float]:
+    """Deterministic fallback embedding so local dev still works without Gemini access."""
+    vector = [0.0] * LOCAL_EMBEDDING_DIM
+    tokens = re.findall(r"[a-z0-9]+", text.lower())
+
+    for token in tokens:
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        index = int.from_bytes(digest[:4], "big") % LOCAL_EMBEDDING_DIM
+        sign = 1.0 if digest[4] % 2 == 0 else -1.0
+        vector[index] += sign
+
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm == 0:
+        return vector
+    return [value / norm for value in vector]
+
+def _candidate_embedding_models() -> tuple[str, ...]:
+    configured = os.getenv("GEMINI_EMBEDDING_MODEL")
+    if configured:
+        return (configured,)
+    return ("models/text-embedding-004", "models/embedding-001")
+
+def _network_is_disabled() -> bool:
+    proxy_values = [
+        os.getenv("HTTPS_PROXY", ""),
+        os.getenv("HTTP_PROXY", ""),
+        os.getenv("ALL_PROXY", ""),
+    ]
+    return any("127.0.0.1:9" in value for value in proxy_values)
+
+def get_embedding(text: str, task_type: str = "retrieval_document") -> List[float]:
+    """
+    Returns a vector embedding for `text`.
+
+    Gemini embeddings are preferred, but local development should not 500 when
+    the configured model is unavailable, the API key is missing, or networking is
+    blocked. In those cases we fall back to a deterministic hashed embedding.
+    """
+    global _REMOTE_EMBEDDING_UNAVAILABLE
+
+    if os.getenv("RAGSCOPE_LOCAL_EMBEDDINGS", "").lower() in {"1", "true", "yes"}:
+        return _local_embedding(text)
+
+    if _REMOTE_EMBEDDING_UNAVAILABLE or not os.getenv("GEMINI_API_KEY") or _network_is_disabled():
+        return _local_embedding(text)
+
+    # Model name differs across Gemini SDKs; prefer the widely-available embedding model.
+    # If the first model fails (e.g. older account/region), fall back.
+    last_err: Exception | None = None
+    for model in _candidate_embedding_models():
+        try:
+            res = genai.embed_content(
+                model=model,
+                content=text,
+                task_type=task_type,
+            )
+            emb = res.get("embedding") if isinstance(res, dict) else getattr(res, "embedding", None)
+            if emb is None:
+                raise RuntimeError("Embedding response missing `embedding` field")
+            return list(emb)
+        except Exception as e:
+            last_err = e
+            continue
+
+    _REMOTE_EMBEDDING_UNAVAILABLE = True
+    print(f"Gemini embeddings unavailable, using local fallback: {last_err}")
+    return _local_embedding(text)
 
 def cosine_similarity(v1: List[float], v2: List[float]) -> float:
     dot_product = sum(x * y for x, y in zip(v1, v2))
@@ -56,7 +120,7 @@ class PurePythonVectorStore:
         if not self.data["ids"]:
             return {"documents": [[]], "metadatas": [[]], "distances": [[]]}
 
-        q_emb = get_embedding(query_texts[0])
+        q_emb = get_embedding(query_texts[0], task_type="retrieval_query")
 
         results = []
         for i in range(len(self.data["ids"])):

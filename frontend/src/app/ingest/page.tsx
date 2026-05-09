@@ -25,8 +25,10 @@ export default function IngestPage() {
       });
       setResult({ docId: res.data.document_id, chunks: res.data.chunks_indexed });
     } catch (e) {
-      console.error(e);
-      alert("Failed to upload document.");
+      const detail = axios.isAxiosError(e)
+        ? e.response?.data?.detail || e.message
+        : "Please try again.";
+      alert(`Failed to upload document. ${detail}`);
     } finally {
       setIsUploading(false);
     }
